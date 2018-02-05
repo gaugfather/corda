@@ -91,7 +91,8 @@ class DriverDSLImpl(
         val notarySpecs: List<NotarySpec>,
         val compatibilityZone: CompatibilityZoneParams?,
         val networkParameters: NetworkParameters,
-        val notaryCustomOverrides: Map<String, Any?>
+        val notaryCustomOverrides: Map<String, Any?>,
+        val inMemoryDB: Boolean
 ) : InternalDriverDSL {
     private var _executorService: ScheduledExecutorService? = null
     val executorService get() = _executorService!!
@@ -108,6 +109,17 @@ class DriverDSLImpl(
     private lateinit var networkMapAvailability: CordaFuture<LocalNetworkMap?>
     private lateinit var _notaries: CordaFuture<List<NotaryHandle>>
     override val notaryHandles: List<NotaryHandle> get() = _notaries.getOrThrow()
+
+    // While starting with inProcess mode, we need to have different names to avoid clashes
+    private var inMemoryCounter = 0
+    private fun getDatabaseConfig() = if (inMemoryDB) {
+        mapOf("dataSourceProperties" to mapOf(
+                "dataSource.url" to "jdbc:h2:mem:persistence${inMemoryCounter++};DB_CLOSE_ON_EXIT=FALSE;LOCK_TIMEOUT=10000;WRITE_DELAY=100"
+        ))
+    } else {
+        // Do not override DB settings, use node defaults (H2 file)
+        emptyMap()
+    }
 
     interface Waitable {
         @Throws(InterruptedException::class)
@@ -227,7 +239,7 @@ class DriverDSLImpl(
                 "useTestClock" to useTestClock,
                 "rpcUsers" to if (users.isEmpty()) defaultRpcUserList else users.map { it.toConfig().root().unwrapped() },
                 "verifierType" to verifierType.name
-        ) + czUrlConfig + customOverrides
+        ) + czUrlConfig + customOverrides + getDatabaseConfig()
         val config = NodeConfig(ConfigHelper.loadConfig(
                 baseDirectory = baseDirectory(name),
                 allowMissingConfig = true,
@@ -250,7 +262,7 @@ class DriverDSLImpl(
                                 "adminAddress" to portAllocation.nextHostAndPort().toString()
                         ),
                         "devMode" to false)
-        ))
+        )+getDatabaseConfig())
 
         config.corda.certificatesDirectory.createDirectories()
         // Create network root truststore.
@@ -370,7 +382,7 @@ class DriverDSLImpl(
                 baseDirectory = baseDirectory(name),
                 allowMissingConfig = true,
                 configOverrides = rawConfig.toNodeOnly()
-        )
+        ) + getDatabaseConfig()
         val cordaConfig = typesafe.parseAsNodeConfiguration()
         val config = NodeConfig(rawConfig, cordaConfig)
         return startNodeInternal(config, webAddress, null, "512m", localNetworkMap)
@@ -1048,7 +1060,8 @@ fun <DI : DriverDSL, D : InternalDriverDSL, A> genericDriver(
                     notarySpecs = defaultParameters.notarySpecs,
                     compatibilityZone = null,
                     networkParameters = defaultParameters.networkParameters,
-                    notaryCustomOverrides = defaultParameters.notaryCustomOverrides
+                    notaryCustomOverrides = defaultParameters.notaryCustomOverrides,
+                    inMemoryDB = defaultParameters.inMemoryDB
             )
     )
     val shutdownHook = addShutdownHook(driverDsl::shutdown)
@@ -1127,6 +1140,7 @@ fun <A> internalDriver(
         networkParameters: NetworkParameters = DriverParameters().networkParameters,
         compatibilityZone: CompatibilityZoneParams? = null,
         notaryCustomOverrides: Map<String, Any?> = DriverParameters().notaryCustomOverrides,
+        inMemoryDB: Boolean = DriverParameters().inMemoryDB,
         dsl: DriverDSLImpl.() -> A
 ): A {
     return genericDriver(
@@ -1144,7 +1158,8 @@ fun <A> internalDriver(
                     jmxPolicy = jmxPolicy,
                     compatibilityZone = compatibilityZone,
                     networkParameters = networkParameters,
-                    notaryCustomOverrides = notaryCustomOverrides
+                    notaryCustomOverrides = notaryCustomOverrides,
+                    inMemoryDB = inMemoryDB
             ),
             coerce = { it },
             dsl = dsl,

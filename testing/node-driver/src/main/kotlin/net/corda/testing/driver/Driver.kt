@@ -234,7 +234,8 @@ fun <A> driver(defaultParameters: DriverParameters = DriverParameters(), dsl: Dr
                     jmxPolicy = defaultParameters.jmxPolicy,
                     compatibilityZone = null,
                     networkParameters = defaultParameters.networkParameters,
-                    notaryCustomOverrides = defaultParameters.notaryCustomOverrides
+                    notaryCustomOverrides = defaultParameters.notaryCustomOverrides,
+                    inMemoryDB = defaultParameters.inMemoryDB
             ),
             coerce = { it },
             dsl = dsl,
@@ -283,7 +284,8 @@ data class DriverParameters(
         val jmxPolicy: JmxPolicy = JmxPolicy(),
         val networkParameters: NetworkParameters = testNetworkParameters(notaries = emptyList()),
         val notaryCustomOverrides: Map<String, Any?> = emptyMap(),
-        val initialiseSerialization: Boolean = true
+        val initialiseSerialization: Boolean = true,
+        val inMemoryDB: Boolean = true
     ) {
     constructor(
             isDebug: Boolean,
@@ -297,7 +299,8 @@ data class DriverParameters(
             notarySpecs: List<NotarySpec>,
             extraCordappPackagesToScan: List<String>,
             jmxPolicy: JmxPolicy,
-            networkParameters: NetworkParameters
+            networkParameters: NetworkParameters,
+            inMemoryDB: Boolean
     ) : this(
             isDebug,
             driverDirectory,
@@ -312,6 +315,7 @@ data class DriverParameters(
             jmxPolicy,
             networkParameters,
             emptyMap(),
+            true,
             true
     )
 
@@ -328,7 +332,8 @@ data class DriverParameters(
             extraCordappPackagesToScan: List<String>,
             jmxPolicy: JmxPolicy,
             networkParameters: NetworkParameters,
-            initialiseSerialization: Boolean
+            initialiseSerialization: Boolean,
+            inMemoryDB: Boolean
     ) : this(
             isDebug,
             driverDirectory,
@@ -343,7 +348,8 @@ data class DriverParameters(
             jmxPolicy,
             networkParameters,
             emptyMap(),
-            initialiseSerialization
+            initialiseSerialization,
+            inMemoryDB
     )
 
     fun withIsDebug(isDebug: Boolean): DriverParameters = copy(isDebug = isDebug)
@@ -360,6 +366,7 @@ data class DriverParameters(
     fun withJmxPolicy(jmxPolicy: JmxPolicy): DriverParameters = copy(jmxPolicy = jmxPolicy)
     fun withNetworkParameters(networkParameters: NetworkParameters): DriverParameters = copy(networkParameters = networkParameters)
     fun withNotaryCustomOverrides(notaryCustomOverrides: Map<String, Any?>): DriverParameters = copy(notaryCustomOverrides = notaryCustomOverrides)
+    fun withInMemoryDB(inMemoryDB: Boolean): DriverParameters = copy(inMemoryDB = inMemoryDB)
 
     fun copy(
             isDebug: Boolean,
